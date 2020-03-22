@@ -26,10 +26,12 @@ python -m marketdata C:\config.ini
 ```
 
 ### Config file structure
+```
 [Market]
 api_key="Your API key"
 currencies = ["BTC USD", "USD UAH", "USD RUB"]
 symbols = ["DJIA", "INX", "MSFT", "AMZN", "GOOG", "TSLA", "LM", "AAPL"]
+```
 
 Currencies are space separated 'From' 'To'
 
