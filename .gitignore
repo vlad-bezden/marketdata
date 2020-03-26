@@ -2,3 +2,5 @@ build
 dist
 marketdata.egg-info
 */__pycache__
+.env
+.eggs
