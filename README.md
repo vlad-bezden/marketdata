@@ -2,6 +2,8 @@
 An example application on how to get foreign exchange (FX) from
 https://openexchangerates.org and market data from https://fmpcloud.io
 
+All data loads are done via asyncio and executed on separate threads
+
 It also provides examples on how to use:
 - pandas
 - configparser
