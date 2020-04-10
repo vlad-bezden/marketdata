@@ -6,6 +6,13 @@ from urllib import request, parse
 import pandas as pd
 import configparser
 from types import SimpleNamespace
+from enum import IntFlag
+
+
+class InfoType(IntFlag):
+    FX = 1
+    MARKET = 2
+    ALL = 3
 
 
 class Market:
@@ -13,7 +20,7 @@ class Market:
     CRYPTO_API_URL = r"https://fmpcloud.io/api/v3/quotes/crypto?apikey={0}"
     FX_API_URL = r"https://openexchangerates.org/api/latest.json?app_id={0}"
 
-    def __init__(self, context, info_type):
+    def __init__(self, context, info_type: InfoType):
         self._context = context
         self._info_type = info_type
         self._fmp_api_key = context.fmp_api_key
@@ -86,27 +93,31 @@ class Market:
 
         return df.round(2)
 
-    async def run(self):
+    def run(self):
         """Executes specific functions depends on the passed parameters"""
-        loop = asyncio.get_running_loop()
 
-        info_type = self._info_type
-        results = []
+        async def inner():
+            loop = asyncio.get_running_loop()
 
-        if info_type == "market" or info_type == "all":
-            results.append(
-                loop.run_in_executor(None, self._market_data, self._context.indexes)
-            )
-            results.append(
-                loop.run_in_executor(None, self._market_data, self._context.symbols)
-            )
+            info_type = self._info_type
+            results = []
 
-        if info_type == "fx" or info_type == "all":
-            results.append(loop.run_in_executor(None, self._crypto_data))
-            results.append(loop.run_in_executor(None, self._exchange_rates))
+            if info_type & InfoType.MARKET:
+                results.append(
+                    loop.run_in_executor(None, self._market_data, self._context.indexes)
+                )
+                results.append(
+                    loop.run_in_executor(None, self._market_data, self._context.symbols)
+                )
 
-        for df in await asyncio.gather(*results):
-            print(df.to_markdown(tablefmt="psql", numalign="right"))
+            if info_type & InfoType.FX:
+                results.append(loop.run_in_executor(None, self._crypto_data))
+                results.append(loop.run_in_executor(None, self._exchange_rates))
+
+            for df in await asyncio.gather(*results):
+                print(df.to_markdown(tablefmt="psql", numalign="right"))
+
+        asyncio.run(inner())
 
 
 def config_parser(config_file, env_file):
@@ -147,9 +158,10 @@ def parse_args():
     parser.add_argument(
         "-i",
         "--info_type",
+        type=lambda t: InfoType[t],
         help="Market information",
-        choices=["market", "fx", "all"],
-        default="all",
+        choices=list(InfoType),
+        default=InfoType.ALL
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="increase output verbosity"
@@ -175,8 +187,7 @@ def main():
     args.env_file.close()
 
     # run coroutine
-    market = Market(config, args.info_type)
-    asyncio.run(market.run())
+    Market(config, args.info_type).run()
 
 
 if __name__ == "__main__":
