@@ -8,11 +8,6 @@ import configparser
 from types import SimpleNamespace
 
 
-def pprint(df):
-    """Prints DataFrame in a nice tabular format"""
-    print(df.to_markdown(tablefmt="psql", numalign="right"))
-
-
 class Market:
     MARKET_API_URL = r"https://fmpcloud.io/api/v3/quote/{1}?apikey={0}"
     CRYPTO_API_URL = r"https://fmpcloud.io/api/v3/quotes/crypto?apikey={0}"
@@ -96,22 +91,22 @@ class Market:
         loop = asyncio.get_running_loop()
 
         info_type = self._info_type
+        results = []
 
         if info_type == "market" or info_type == "all":
-            results = [
-                loop.run_in_executor(None, self._market_data, i)
-                for i in [self._context.indexes, self._context.symbols]
-            ]
-
-            for df in await asyncio.gather(*results):
-                pprint(df)
+            results.append(
+                loop.run_in_executor(None, self._market_data, self._context.indexes)
+            )
+            results.append(
+                loop.run_in_executor(None, self._market_data, self._context.symbols)
+            )
 
         if info_type == "fx" or info_type == "all":
-            result1 = loop.run_in_executor(None, self._crypto_data)
-            result2 = loop.run_in_executor(None, self._exchange_rates)
+            results.append(loop.run_in_executor(None, self._crypto_data))
+            results.append(loop.run_in_executor(None, self._exchange_rates))
 
-            for df in await asyncio.gather(result1, result2):
-                pprint(df)
+        for df in await asyncio.gather(*results):
+            print(df.to_markdown(tablefmt="psql", numalign="right"))
 
 
 def config_parser(config_file, env_file):
