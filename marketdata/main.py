@@ -14,6 +14,19 @@ class InfoType(IntFlag):
     MARKET = 2
     ALL = 3
 
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return str(self)
+
+    @staticmethod
+    def from_string(s):
+        try:
+            return InfoType[s.upper()]
+        except KeyError:
+            return s
+
 
 class Market:
     MARKET_API_URL = r"https://fmpcloud.io/api/v3/quote/{1}?apikey={0}"
@@ -158,10 +171,10 @@ def parse_args():
     parser.add_argument(
         "-i",
         "--info_type",
-        type=lambda t: InfoType[t],
+        type=InfoType.from_string,
         help="Market information",
         choices=list(InfoType),
-        default=InfoType.ALL
+        default=InfoType.ALL,
     )
     parser.add_argument(
         "-v", "--verbose", action="store_true", help="increase output verbosity"

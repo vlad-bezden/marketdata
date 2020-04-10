@@ -24,6 +24,10 @@ pip install -r reaquirements.txt
 After application installed you can run it by:
 
 ```
+marketdata path\to\config.ini path\to\.env -i ALL
+```
+By default all market data and foreign exchange will be return
+```
 marketdata path\to\config.ini path\to\.env
 ```
 or
@@ -31,6 +35,15 @@ or
 ```
 python -m marketdata path\to\config.ini path\to\.env
 ```
+
+### Valid Flags for info_type
+By default marketdata return both market data as well as foreign exchange information
+That can be changed by passing different values for -i
+
+#### -i values
+* FX - foreign exchange
+* MARKET - market information
+* ALL - Both market and foreign exchange (default value)
 
 ### Config file structure
 ```
