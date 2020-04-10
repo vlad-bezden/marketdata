@@ -10,10 +10,15 @@ It also provides examples on how to use:
 - urllib
 - logging
 - json
-
-The biggest reason for using pandas is it provides out of the box nice console output.
+- print pandas in a nice tabulated format
 
 It also provides example on how to use __main__ and setup.py files to use command prompt to run application
+
+## Installation
+
+```
+pip install -r reaquirements.txt
+```
 
 ## Usage
 After application installed you can run it by:

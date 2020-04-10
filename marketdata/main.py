@@ -6,124 +6,116 @@ from urllib import request, parse
 import pandas as pd
 import configparser
 from types import SimpleNamespace
-from functools import partial
-
-MARKET_API_URL = r"https://fmpcloud.io/api/v3/quote/{1}?apikey={0}"
-CRYPTO_API_URL = r"https://fmpcloud.io/api/v3/quotes/crypto?apikey={0}"
-FX_API_URL = r"https://openexchangerates.org/api/latest.json?app_id={0}"
 
 
-def break_line():
-    """Prints divide line"""
-
-    print(f"{'=' * 54}\n")
-
-
-def market_data(api_key, symbols):
-    """Get market data for list of symbols"""
-
-    # Get stock prices
-    url = MARKET_API_URL.format(api_key, parse.quote(",".join(symbols)))
-
-    with request.urlopen(url) as handle:
-        results = json.loads(handle.read())
-
-    # only get data that we need
-    keys = ["symbol", "price", "change", "changesPercentage", "timestamp"]
-    values = [[item[key] for key in keys] for item in results]
-    keys[3] = "change %"
-
-    df = pd.DataFrame(data=values, columns=keys).set_index("symbol")
-    df.price = df.price.astype(float)
-    df.change = df.change.astype(float)
-    df.timestamp = pd.to_datetime(df.timestamp, unit="s")
-
-    return df.round(2)
+def pprint(df):
+    """Prints DataFrame in a nice tabular format"""
+    print(df.to_markdown(tablefmt="psql", numalign="right"))
 
 
-def crypto_data(api_key, cryptos):
-    """Get crypto currencies data for list of cryptos"""
+class Market:
+    MARKET_API_URL = r"https://fmpcloud.io/api/v3/quote/{1}?apikey={0}"
+    CRYPTO_API_URL = r"https://fmpcloud.io/api/v3/quotes/crypto?apikey={0}"
+    FX_API_URL = r"https://openexchangerates.org/api/latest.json?app_id={0}"
 
-    url = CRYPTO_API_URL.format(api_key)
+    def __init__(self, context, info_type):
+        self._context = context
+        self._info_type = info_type
+        self._fmp_api_key = context.fmp_api_key
+        self._fx_api_key = context.fx_api_key
 
-    with request.urlopen(url) as handle:
-        results = [i for i in json.loads(handle.read()) if i["symbol"] in cryptos]
+    def _market_data(self, symbols):
+        """Get market data for list of symbols"""
+        # Get stock prices
+        url = self.MARKET_API_URL.format(
+            self._fmp_api_key, parse.quote(",".join(symbols))
+        )
 
-    # only get data that we need
-    keys = ["symbol", "price", "change", "changesPercentage", "timestamp"]
-    values = [[item[key] for key in keys] for item in results]
-    keys[3] = "change %"
+        with request.urlopen(url) as handle:
+            results = json.loads(handle.read())
 
-    df = pd.DataFrame(data=values, columns=keys).set_index("symbol")
-    df.price = df.price.astype(float)
-    df.change = df.change.astype(float)
-    df.timestamp = pd.to_datetime(df.timestamp, unit="s")
+        # only get data that we need
+        keys = ["symbol", "price", "change", "changesPercentage", "timestamp"]
+        values = [[item[key] for key in keys] for item in results]
+        keys[3] = "change %"
 
-    return df.round(2)
+        df = pd.DataFrame(data=values, columns=keys).set_index("symbol")
+        df.price = df.price.astype(float)
+        df.change = df.change.astype(float)
+        df.timestamp = pd.to_datetime(df.timestamp, unit="s")
 
+        return df.round(2)
 
-def exchange_rates(api_key, currencies):
-    """Gets exchange rate for list of currencies"""
+    def _crypto_data(self):
+        """Get crypto currencies data for list of cryptos"""
+        url = self.CRYPTO_API_URL.format(self._fmp_api_key)
 
-    url = FX_API_URL.format(api_key)
+        with request.urlopen(url) as handle:
+            results = [
+                i
+                for i in json.loads(handle.read())
+                if i["symbol"] in self._context.cryptos
+            ]
 
-    with request.urlopen(url) as handle:
-        results = json.loads(handle.read())
+        # only get data that we need
+        keys = ["symbol", "price", "change", "changesPercentage", "timestamp"]
+        values = [[item[key] for key in keys] for item in results]
+        keys[3] = "change %"
 
-    from_ = results["base"]
-    timestamp = results["timestamp"]
-    values = [
-        (from_, k, v, timestamp) for k, v in results["rates"].items() if k in currencies
-    ]
-    columns = ["From", "To", "Rate", "timestamp"]
+        df = pd.DataFrame(data=values, columns=keys).set_index("symbol")
+        df.price = df.price.astype(float)
+        df.change = df.change.astype(float)
+        df.timestamp = pd.to_datetime(df.timestamp, unit="s")
 
-    df = pd.DataFrame(data=values, columns=columns).set_index(["From", "To"])
-    df.Rate = df.Rate.astype(float)
-    df.timestamp = pd.to_datetime(df.timestamp, unit="s")
+        return df.round(2)
 
-    return df.round(2)
+    def _exchange_rates(self):
+        """Gets exchange rate for list of currencies"""
+        url = self.FX_API_URL.format(self._fx_api_key)
 
+        with request.urlopen(url) as handle:
+            results = json.loads(handle.read())
 
-async def runner(info_type, context):
-    """Executes specific functions depends on the passed parameters"""
-
-    loop = asyncio.get_running_loop()
-
-    if info_type == "market":
-        market_data_ = partial(market_data, context.fmp_api_key)
-
-        results = [
-            loop.run_in_executor(None, market_data_, i)
-            for i in [context.indexes, context.symbols]
+        from_ = results["base"]
+        timestamp = results["timestamp"]
+        values = [
+            (from_, k, v, timestamp)
+            for k, v in results["rates"].items()
+            if k in self._context.currencies
         ]
+        columns = ["From", "To", "Rate", "timestamp"]
 
-        for result in await asyncio.gather(*results):
-            print(result)
-            break_line()
+        df = pd.DataFrame(data=values, columns=columns).set_index(["From", "To"])
+        df.Rate = df.Rate.astype(float)
+        df.timestamp = pd.to_datetime(df.timestamp, unit="s")
 
-    elif info_type == "fx":
-        result1 = loop.run_in_executor(
-            None, crypto_data, context.fmp_api_key, context.cryptos
-        )
-        result2 = loop.run_in_executor(
-            None, exchange_rates, context.fx_api_key, context.currencies
-        )
+        return df.round(2)
 
-        for result in await asyncio.gather(result1, result2):
-            print(result)
-            break_line()
+    async def run(self):
+        """Executes specific functions depends on the passed parameters"""
+        loop = asyncio.get_running_loop()
 
-    elif info_type == "all":
-        await asyncio.gather(runner("market", context), runner("fx", context))
-    else:
-        logging.error(
-            "Invalid info_type %s. It must be 'market', 'fx' or 'all'", info_type
-        )
+        info_type = self._info_type
+
+        if info_type == "market" or info_type == "all":
+            results = [
+                loop.run_in_executor(None, self._market_data, i)
+                for i in [self._context.indexes, self._context.symbols]
+            ]
+
+            for df in await asyncio.gather(*results):
+                pprint(df)
+
+        if info_type == "fx" or info_type == "all":
+            result1 = loop.run_in_executor(None, self._crypto_data)
+            result2 = loop.run_in_executor(None, self._exchange_rates)
+
+            for df in await asyncio.gather(result1, result2):
+                pprint(df)
 
 
 def config_parser(config_file, env_file):
     """Loads configuration data from config file to the context object"""
-
     config = configparser.ConfigParser()
     config.read_file(config_file)
     config.read_file(env_file)
@@ -172,8 +164,7 @@ def parse_args():
 
 
 def main():
-    """Called by __main__ and this function"""
-
+    """Called by __main__ and this module"""
     args = parse_args()
 
     logging.basicConfig(
@@ -189,7 +180,8 @@ def main():
     args.env_file.close()
 
     # run coroutine
-    asyncio.run(runner(args.info_type, config))
+    market = Market(config, args.info_type)
+    asyncio.run(market.run())
 
 
 if __name__ == "__main__":
