@@ -1,2 +1,6 @@
 pandas
 tabulate
+
+# dev
+setuptools
+wheel

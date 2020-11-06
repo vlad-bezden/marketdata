@@ -4,3 +4,4 @@ marketdata.egg-info
 */__pycache__
 .env
 .eggs
+.venv

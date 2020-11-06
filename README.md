@@ -17,7 +17,7 @@ It also provides example on how to use __main__ and setup.py files to use comman
 ## Installation
 
 ```
-pip install -r reaquirements.txt
+pip install -r requirements.txt
 ```
 
 ## Usage

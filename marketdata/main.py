@@ -21,7 +21,7 @@ class InfoType(IntFlag):
         return str(self)
 
     @staticmethod
-    def from_string(s):
+    def from_string(s:str):
         try:
             return InfoType[s.upper()]
         except KeyError:
@@ -39,7 +39,7 @@ class Market:
         self._fmp_api_key = context.fmp_api_key
         self._fx_api_key = context.fx_api_key
 
-    def _market_data(self, symbols):
+    def _market_data(self, symbols: list[str]) -> pd.DataFrame:
         """Get market data for list of symbols"""
         # Get stock prices
         url = self.MARKET_API_URL.format(
@@ -133,7 +133,7 @@ class Market:
         asyncio.run(inner())
 
 
-def config_parser(config_file, env_file):
+def config_parser(config_file: str, env_file: str):
     """Loads configuration data from config file to the context object"""
     config = configparser.ConfigParser()
     config.read_file(config_file)
