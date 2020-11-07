@@ -5,8 +5,17 @@ import json
 from urllib import request, parse
 import pandas as pd
 import configparser
-from types import SimpleNamespace
 from enum import IntFlag
+from typing import NamedTuple, List
+
+
+class Config(NamedTuple):
+    currencies: str
+    symbols: str
+    indexes: str
+    cryptos: str
+    fx_api_key: str
+    fmp_api_key: str
 
 
 class InfoType(IntFlag):
@@ -21,7 +30,7 @@ class InfoType(IntFlag):
         return str(self)
 
     @staticmethod
-    def from_string(s:str):
+    def from_string(s: str):
         try:
             return InfoType[s.upper()]
         except KeyError:
@@ -33,19 +42,20 @@ class Market:
     CRYPTO_API_URL = r"https://fmpcloud.io/api/v3/quotes/crypto?apikey={0}"
     FX_API_URL = r"https://openexchangerates.org/api/latest.json?app_id={0}"
 
-    def __init__(self, context, info_type: InfoType):
-        self._context = context
+    def __init__(self, config: Config, info_type: InfoType) -> None:
+        self._context = config
         self._info_type = info_type
-        self._fmp_api_key = context.fmp_api_key
-        self._fx_api_key = context.fx_api_key
+        self._fmp_api_key = config.fmp_api_key
+        self._fx_api_key = config.fx_api_key
 
-    def _market_data(self, symbols: list[str]) -> pd.DataFrame:
-        """Get market data for list of symbols"""
-        # Get stock prices
+    def _market_data(self, symbols: List[str]) -> pd.DataFrame:
+        """Get market data for list of symbols."""
+
         url = self.MARKET_API_URL.format(
             self._fmp_api_key, parse.quote(",".join(symbols))
         )
 
+        # Get stock prices
         with request.urlopen(url) as handle:
             results = json.loads(handle.read())
 
@@ -61,8 +71,9 @@ class Market:
 
         return df.round(2)
 
-    def _crypto_data(self):
-        """Get crypto currencies data for list of cryptos"""
+    def _crypto_data(self) -> pd.DataFrame:
+        """Get crypto currencies data for list of cryptos."""
+
         url = self.CRYPTO_API_URL.format(self._fmp_api_key)
 
         with request.urlopen(url) as handle:
@@ -84,8 +95,9 @@ class Market:
 
         return df.round(2)
 
-    def _exchange_rates(self):
-        """Gets exchange rate for list of currencies"""
+    def _exchange_rates(self) -> pd.DataFrame:
+        """Gets exchange rate for list of currencies."""
+
         url = self.FX_API_URL.format(self._fx_api_key)
 
         with request.urlopen(url) as handle:
@@ -106,8 +118,8 @@ class Market:
 
         return df.round(2)
 
-    def run(self):
-        """Executes specific functions depends on the passed parameters"""
+    def run(self) -> None:
+        """Executes specific functions depends on the passed parameters."""
 
         async def inner():
             loop = asyncio.get_running_loop()
@@ -133,24 +145,25 @@ class Market:
         asyncio.run(inner())
 
 
-def config_parser(config_file: str, env_file: str):
-    """Loads configuration data from config file to the context object"""
+def config_parser(config_file: str, env_file: str) -> Config:
+    """Loads configuration data from config file to the context object."""
+
     config = configparser.ConfigParser()
     config.read_file(config_file)
     config.read_file(env_file)
     market_sec = config["Market"]
-    return SimpleNamespace(
-        currencies=json.loads(market_sec["currencies"]),
-        symbols=json.loads(market_sec["symbols"]),
-        indexes=json.loads(market_sec["indexes"]),
-        cryptos=json.loads(market_sec["cryptos"]),
-        fx_api_key=market_sec["fx_api_key"],
-        fmp_api_key=market_sec["fmp_api_key"],
+    return Config(
+        json.loads(market_sec["currencies"]),
+        json.loads(market_sec["symbols"]),
+        json.loads(market_sec["indexes"]),
+        json.loads(market_sec["cryptos"]),
+        market_sec["fx_api_key"],
+        market_sec["fmp_api_key"],
     )
 
 
 def parse_args():
-    """Parses command line parameters"""
+    """Parses command line parameters."""
 
     parser = argparse.ArgumentParser(
         description="Provides market value for securities and exchange rates "
@@ -184,7 +197,8 @@ def parse_args():
 
 
 def main():
-    """Called by __main__ and this module"""
+    """Called by __main__ and this module."""
+
     args = parse_args()
 
     logging.basicConfig(
